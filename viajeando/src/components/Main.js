@@ -4,15 +4,18 @@ import { Search, Menu, Favorite, FavoriteBorder } from '@mui/icons-material';
 import { jwtDecode } from 'jwt-decode';
 import { useLocation } from 'wouter';
 
-function getEmailFromToken() {
+function getIdFromToken() {
   const token = localStorage.getItem('authToken');
-  if (!token) {
-    return null;
-  }
+  if (!token) return null;
 
   try {
     const decodedToken = jwtDecode(token);
-    return decodedToken.email;
+    const currentTime = Math.floor(Date.now() / 1000);
+    if (decodedToken.exp < currentTime) {
+      localStorage.removeItem('authToken'); // Eliminar token caducado
+      return null;
+    }
+    return decodedToken.id;
   } catch (error) {
     console.error("Error decoding token", error);
     return null;
@@ -24,8 +27,10 @@ function Main() {
   const [destinos, setDestinos] = useState([]);
   const [modal, setModal] = useState({ visible: false, message: '' });
   const [, setLocation] = useLocation();
-  const [favoriteStates, setFavoriteStates] = useState({}); // Estado para manejar los favoritos individuales
+  const [favoriteStates, setFavoriteStates] = useState({});
+  const [allFavorites, setAllFavorites] = useState([]); // Estado para manejar los favoritos individuales
 
+  // Cargar destinos al inicializar
   useEffect(() => {
     async function fetchDestinos() {
       try {
@@ -40,64 +45,126 @@ function Main() {
   }, []);
 
   useEffect(() => {
-    const syncFavorites = async () => {
-      const favorites = JSON.parse(localStorage.getItem('favoritos')) || [];
-      const email = getEmailFromToken();
-      if (email && favorites.length > 0) {
-        try {
-          // Sincroniza los favoritos con el backend
-          await fetch('http://localhost:8000/favoritos/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, favoritos: favorites }),
-          });
-          console.log('Favoritos sincronizados con el backend.');
-        } catch (error) {
-          console.error('Error al sincronizar favoritos:', error);
-        }
-      }
+    const fetchFavorites = async () => {
+      const id = getIdFromToken();
+      if (!id) return;
 
-      // Actualiza el estado de los favoritos (si los tiene)
-      const initialFavoriteStates = favorites.reduce((acc, id) => {
-        acc[id] = true;
-        return acc;
-      }, {});
-      setFavoriteStates(initialFavoriteStates); // Esto actualizará el estado de los favoritos
+      try {
+        // Obtener los favoritos desde el backend
+        const response = await fetch(`http://localhost:8000/favoritos/${id}`);
+        const backendFavorites = await response.json();
+
+        // Almacenar los favoritos tanto en localStorage como en state
+        const favoritosIds = backendFavorites.map((fav) => {
+          if (fav.ID_DESTINO !== undefined) {  // Verifica que ID_DESTINO existe
+            console.log(fav.ID_DESTINO);  // Imprime el ID_DESTINO
+            return fav.ID_DESTINO;        // Retorna el valor si existe
+          }
+          return null;  // Retorna null si no existe ID_DESTINO
+        }).filter(id => id !== null);  // Filtra los valores nulos
+
+        setAllFavorites(backendFavorites);
+        
+        // Guardar en localStorage
+        localStorage.setItem('favoritos', JSON.stringify(favoritosIds));
+
+        // Crear el estado inicial de los favoritos para usar en la UI (mapeando los IDs de los favoritos a 'true')
+        const initialFavoriteStates = backendFavorites.reduce((acc, { ID_DESTINO }) => {
+          if (ID_DESTINO !== undefined) {
+            acc[ID_DESTINO] = true;
+          }
+          return acc;
+        }, {});
+        setFavoriteStates(initialFavoriteStates);
+      } catch (error) {
+        console.error('Error al obtener favoritos:', error);
+      }
     };
 
-    const email = getEmailFromToken();
-    if (email) {
-      syncFavorites();
-    }
+    fetchFavorites();
   }, []);
+
+
+  // Sincronizar favoritos con el backend cuando el usuario se va a otra página o cierra sesión
+  useEffect(() => {
+    const syncFavorites = async () => {
+      const id = getIdFromToken();
+      if (!id) return;
+    
+      try {
+        const backendFavorites = allFavorites;
+    
+        // Obtener todos los destinos favoritos desde favoriteStates (claves del objeto)
+        const localFavorites = Object.keys(favoriteStates).filter(
+          (key) => favoriteStates[key]
+        );
+    
+        // Obtener los IDs de los favoritos del backend
+        const backendIds = new Set(backendFavorites.map((fav) => fav.ID_DESTINO));
+        const favoritesToSync = localFavorites.filter((fav) => !backendIds.has(Number(fav)));
+    
+        if (favoritesToSync.length > 0 || localFavorites.length !== backendIds.size) {
+          // Validar que no haya favoritos nulos o vacíos
+          const validFavorites = localFavorites.filter((fav) => fav != null && fav !== "");
+    
+          if (validFavorites.length > 0) {
+            // Cambié aquí para usar PATCH en lugar de POST
+            await fetch('http://localhost:8000/favoritos/sync', {
+              method: 'PATCH',  // Cambié de POST a PATCH
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                id_usuario: id,  // Asegúrate de enviar id_usuario y no id
+                favoritos: validFavorites,  // Aquí va la lista de favoritos
+              }),
+            });
+            console.log('Favoritos sincronizados con el backend.');
+          } else {
+            console.log('No hay favoritos válidos para sincronizar.');
+          }
+        } else {
+          console.log('No hay cambios en los favoritos, no se sincroniza.');
+        }
+      } catch (error) {
+        console.error('Error al sincronizar favoritos:', error);
+      }
+    };
+    
   
+    // Aquí podrías usar algún hook que te indique cuando el usuario cambió de página o cerró sesión
+    // Para este ejemplo, solo simulo la sincronización cuando el componente se desmonta
+    return () => {
+      syncFavorites();
+    };
+  }, [favoriteStates, allFavorites]); // Dependemos de favoriteStates y allFavorites
+
+
+  // Obtener favoritos del usuario y actualizar el estado de favoritos
   useEffect(() => {
     const fetchUserFavorites = async () => {
-      const email = getEmailFromToken();
-      if (email) {
+      const id = getIdFromToken();
+      if (id) {
         try {
-          const response = await fetch(`http://localhost:8000/favoritos/${email}`);
+          const response = await fetch(`http://localhost:8000/favoritos/${id}`);
           const data = await response.json();
           if (data && Array.isArray(data)) {
-            // Mapear los destinos favoritos a un estado que mantenga el estado de favoritos
             const updatedFavoriteStates = data.reduce((acc, destino) => {
               acc[destino.ID] = true;
               return acc;
             }, {});
-            setFavoriteStates(updatedFavoriteStates); // Actualizar el estado de favoritos
+            setFavoriteStates(updatedFavoriteStates);
           }
         } catch (error) {
           console.error('Error al obtener los favoritos del usuario:', error);
         }
       }
     };
-  
+
     fetchUserFavorites();
   }, []);
 
   const handleDestinationClick = (destino) => {
-    const email = getEmailFromToken();
-    if (email) {
+    const id = getIdFromToken();
+    if (id) {
       setLocation(`/destinos/${destino.ID}`);
     } else {
       setModal({ visible: true, message: 'Para realizar esta acción debe iniciar sesión...' });
@@ -109,56 +176,22 @@ function Main() {
   };
 
   const toggleFavorite = (id_destino) => {
-    const favorites = JSON.parse(localStorage.getItem('favoritos')) || [];
-    if (favorites.includes(id_destino)) {
-      // Eliminar favorito
-      const updatedFavorites = favorites.filter(fav => fav !== id_destino);
-      localStorage.setItem('favoritos', JSON.stringify(updatedFavorites));
-      setFavoriteStates(prevState => ({ ...prevState, [id_destino]: false }));
-    } else {
-      // Agregar favorito
-      favorites.push(id_destino);
-      localStorage.setItem('favoritos', JSON.stringify(favorites));
-      setFavoriteStates(prevState => ({ ...prevState, [id_destino]: true }));
-    }
+    setFavoriteStates((prevState) => {
+      // Si el destino ya es un favorito, lo eliminamos
+      if (prevState[id_destino]) {
+        const newState = { ...prevState };
+        delete newState[id_destino]; // Eliminar el destino de favoritos
+        return newState;
+      } else {
+        // Si el destino no es un favorito, lo agregamos
+        return { ...prevState, [id_destino]: true };
+      }
+    });
   };
-
 
   const filteredDestinos = destinos.filter((destino) =>
     destino.NOMBRE.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  useEffect(() => {
-    const storedFavorites = JSON.parse(localStorage.getItem('favoritos')) || [];
-    const initialFavoriteStates = storedFavorites.reduce((acc, id) => {
-      acc[id] = true;
-      return acc;
-    }, {});
-    setFavoriteStates(initialFavoriteStates);
-  }, []);
-
-  useEffect(() => {
-    const email = getEmailFromToken();
-    if (email) {
-      const syncFavorites = async () => {
-        const favorites = JSON.parse(localStorage.getItem('favoritos')) || [];
-        if (favorites.length > 0) {
-          try {
-            await fetch('http://localhost:8000/favoritos/sync', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email, favoritos: favorites }),
-            });
-            console.log('Favoritos sincronizados con el backend.');
-          } catch (error) {
-            console.error('Error al sincronizar favoritos:', error);
-          }
-        }
-      };
-      syncFavorites();
-    }
-  }, []);
-
 
   return (
     <Container maxWidth={false} sx={{ maxWidth: 1044, marginX: 'auto', paddingTop: '2rem' }}>
@@ -227,9 +260,8 @@ function Main() {
                   },
                 }}
               >
-                {favoriteStates[destino.ID] ? <Favorite sx={{ color: "#FFF000" }} /> : <FavoriteBorder />}
+                {favoriteStates[destino.ID] ? <Favorite sx={{ color: "#FA713B" }} /> : <FavoriteBorder />}
               </IconButton>
-
             </button>
           </Grid2>
         ))}
