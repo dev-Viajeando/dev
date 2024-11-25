@@ -21,19 +21,18 @@ app.use(cors(corsOptions));
 // Middleware para parsear el cuerpo de las peticiones en formato JSON
 app.use(express.json());
 
-// Configurar las rutas
-app.use('/api', destinosRouter);
-app.use('/api', loginRouter);
-app.use('/api', registerRouter);
-app.use('/api', favoritosRouter);
-app.use('/api', origenRouter);
+// Configurar las rutas con diferentes prefijos
+app.use('/api/destinos', destinosRouter);
+app.use('/api/login', loginRouter);
+app.use('/api/register', registerRouter);
+app.use('/api/favoritos', favoritosRouter);
+app.use('/api/origen', origenRouter);
 
 // Configurar el puerto del servidor
 const PORT = 8000;
 app.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });
-
 
 
 // Crear el enrutador y definir las rutas

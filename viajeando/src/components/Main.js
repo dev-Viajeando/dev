@@ -36,7 +36,7 @@ function Main() {
         const response = await fetch('http://localhost:8000/api/destinos');
         const data = await response.json();
         const shuffledData = data.sort(() => Math.random() - 0.5);
-  
+
         setDestinos(shuffledData);
       } catch (error) {
         console.error('Error al obtener destinos:', error);
@@ -126,7 +126,7 @@ function Main() {
 
   return (
     <>
-      <Container maxWidth={false} sx={{ maxWidth: 1044, marginX: 'auto', paddingTop: '5rem'}}>
+      <Container maxWidth={false} sx={{ maxWidth: 1044, marginX: 'auto', paddingTop: '5rem' }}>
         <Typography variant="subtitle1" fontFamily={"Inter"} color="#3BC4FA" fontSize={{ xs: "25px", sm: "32px" }} fontWeight={400}>Visita tu destino favorito</Typography>
         <div className="separator-container my-10">
           <svg
@@ -221,7 +221,7 @@ function Main() {
               </button>
               <h2 className="text-xl font-light w-[264px] text-start">{modal.message}</h2>
               <div>
-                <Button sx={{ color: '#2E9BC6', textTransform: 'none', marginLeft: '37px' }}>Registrarse</Button>
+                <Button href="/register" sx={{ color: '#2E9BC6', textTransform: 'none', marginLeft: '37px' }}>Registrarse</Button>
                 <Button href="/login" sx={{ color: '#2E9BC6', textTransform: 'none' }}>Iniciar sesión</Button>
               </div>
             </div>

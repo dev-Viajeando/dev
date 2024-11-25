@@ -1,7 +1,0 @@
-// @filename: tsconfig.json
-{
-  "deno2node": {
-    "shim": "src/shim.node.ts" // path to shim file, relative to tsconfig
-  }
-}
-  

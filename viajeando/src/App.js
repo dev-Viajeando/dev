@@ -36,7 +36,7 @@ function App() {
     <div className="App bg-[#F5F5F5]">
       <Route path="/" component={Home}/>
       <Route path="/login" component={Login}/>
-      <Route path="/register" component={Register}></Route>
+      <Route path="/register" component={Register}/>
       <Route path="/destinos/:id" component={DestinationPage} />
       <Route path="/destinos/:id/vuelos" component={Flights} />
       <Route path="/favorites" component={Favorites} />
