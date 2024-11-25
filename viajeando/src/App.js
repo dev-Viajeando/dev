@@ -4,6 +4,9 @@ import Main from './components/Main';
 import Login from './login/page';
 import Register from './register/page';
 import DestinationPage from './destination/page';
+import Favorites from './favorites/page';
+import Footer from './components/Footer';
+import Flights from './flights/page';
 import { Route } from "wouter";
 
 
@@ -22,6 +25,7 @@ function Home(){
     <div>
       <MainHeader/>
       <Main/>
+      <Footer/>
     </div>
   )
 }
@@ -34,6 +38,8 @@ function App() {
       <Route path="/login" component={Login}/>
       <Route path="/register" component={Register}></Route>
       <Route path="/destinos/:id" component={DestinationPage} />
+      <Route path="/destinos/:id/vuelos" component={Flights} />
+      <Route path="/favorites" component={Favorites} />
     </div>
   );
 }

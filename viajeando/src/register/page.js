@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { TextField, Button, Checkbox, Typography } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 
 function Register() {
   const [showPassword, setShowPassword] = useState(false);
@@ -10,6 +10,7 @@ function Register() {
   const [repeatPassword, setRepeatPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [, setLocation] = useLocation();
 
   const togglePasswordVisibility = () => {
     setShowPassword((prev) => !prev);
@@ -22,7 +23,7 @@ function Register() {
     }
 
     try {
-      const response = await fetch('http://localhost:8000/register', {
+      const response = await fetch('http://localhost:8000/api/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -35,6 +36,13 @@ function Register() {
       if (response.ok) {
         setSuccessMessage(data.message);
         setErrorMessage('');
+        if (data.token) {
+          console.log(data.token)
+          localStorage.setItem('authToken', data.token);
+          setTimeout(() => setLocation("/"), 100);
+      } else {
+          setErrorMessage('No se recibió un token válido.');
+      }
       } else {
         setErrorMessage(data.message);
         setSuccessMessage('');
